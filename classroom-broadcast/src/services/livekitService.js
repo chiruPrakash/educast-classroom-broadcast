@@ -244,15 +244,49 @@ export class LecturerBroadcaster {
     if (!this.room || !this._isScreenSharing) return;
     await this.room.localParticipant.setScreenShareEnabled(false);
     this._isScreenSharing = false;
+
+    // Bring browser focus back to the website page
+    window.focus();
+
+    // Toggle camera quickly to trigger a keyframe for viewers to recover the stream
+    const camPub = this._getCamPub();
+    if (camPub?.track && !this._isCamOff) {
+      try {
+        await camPub.track.mute();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await camPub.track.unmute();
+      } catch (err) {
+        console.warn('[LiveKit Lecturer] Camera toggle keyframe failed:', err);
+      }
+    }
+
     setTimeout(() => this._notifyLocalStream(), 200);
     console.log('[LiveKit Lecturer] Screen share stopped');
   }
 
-  _handleScreenEnded() {
-    this.room?.localParticipant.setScreenShareEnabled(false).catch(err => {
+  async _handleScreenEnded() {
+    try {
+      await this.room?.localParticipant.setScreenShareEnabled(false);
+    } catch (err) {
       console.warn('[LiveKit Lecturer] Error disabling screenshare after ended:', err);
-    });
+    }
     this._isScreenSharing = false;
+
+    // Bring browser focus back to the website page
+    window.focus();
+
+    // Toggle camera quickly to trigger a keyframe for viewers to recover the stream
+    const camPub = this._getCamPub();
+    if (camPub?.track && !this._isCamOff) {
+      try {
+        await camPub.track.mute();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await camPub.track.unmute();
+      } catch (err) {
+        console.warn('[LiveKit Lecturer] Camera toggle keyframe failed in ended:', err);
+      }
+    }
+
     setTimeout(() => this._notifyLocalStream(), 200);
     this._onStateChange?.({ screenShareStopped: true });
   }

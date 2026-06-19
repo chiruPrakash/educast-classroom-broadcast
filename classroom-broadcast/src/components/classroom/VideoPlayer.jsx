@@ -10,8 +10,15 @@ export default function VideoPlayer({ stream, isConnected, isLecturerCamMuted, i
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !stream) return;
+    if (!video) return;
 
+    if (!stream) {
+      video.srcObject = null;
+      return;
+    }
+
+    // Force reset srcObject to clear browser pipelines and refresh tracks
+    video.srcObject = null;
     video.srcObject = stream;
 
     const playVideo = () => {
