@@ -86,6 +86,12 @@ export class LecturerBroadcaster {
       })
       .on(RoomEvent.LocalTrackPublished, (pub) => {
         console.log('[LiveKit Lecturer] Track published:', pub.source);
+        if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
+          pub.track.mediaStreamTrack.addEventListener('ended', () => {
+            this._handleScreenEnded();
+          }, { once: true });
+          console.log('[LiveKit Lecturer] Screen share ended listener attached via LocalTrackPublished');
+        }
         // Small delay ensures MediaStreamTrack is fully initialized
         setTimeout(() => this._notifyLocalStream(), 150);
       })
@@ -228,6 +234,19 @@ export class LecturerBroadcaster {
         }, { once: true });
       }
 
+      // Schedule a delayed check to guarantee the ended listener gets attached
+      setTimeout(() => {
+        const screenPub = Array.from(this.room.localParticipant.videoTrackPublications.values())
+          .find(p => p.source === Track.Source.ScreenShare);
+        const track = screenPub?.track || pub?.track;
+        if (track?.mediaStreamTrack) {
+          track.mediaStreamTrack.addEventListener('ended', () => {
+            this._handleScreenEnded();
+          }, { once: true });
+          console.log('[LiveKit Lecturer] Screen share ended listener attached via publishScreen timeout');
+        }
+      }, 300);
+
       console.log('[LiveKit Lecturer] Screen share started');
     } catch (err) {
       if (err.name !== 'NotAllowedError') {
@@ -248,12 +267,19 @@ export class LecturerBroadcaster {
     // Bring browser focus back to the website page
     window.focus();
 
+    // Flash document title to alert the user
+    const originalTitle = document.title;
+    document.title = "🔴 Screen Share Stopped!";
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 3000);
+
     // Toggle camera quickly to trigger a keyframe for viewers to recover the stream
     const camPub = this._getCamPub();
     if (camPub?.track && !this._isCamOff) {
       try {
         await camPub.track.mute();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 150));
         await camPub.track.unmute();
       } catch (err) {
         console.warn('[LiveKit Lecturer] Camera toggle keyframe failed:', err);
@@ -275,12 +301,19 @@ export class LecturerBroadcaster {
     // Bring browser focus back to the website page
     window.focus();
 
+    // Flash document title to alert the user
+    const originalTitle = document.title;
+    document.title = "🔴 Screen Share Stopped!";
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 3000);
+
     // Toggle camera quickly to trigger a keyframe for viewers to recover the stream
     const camPub = this._getCamPub();
     if (camPub?.track && !this._isCamOff) {
       try {
         await camPub.track.mute();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 150));
         await camPub.track.unmute();
       } catch (err) {
         console.warn('[LiveKit Lecturer] Camera toggle keyframe failed in ended:', err);
@@ -357,6 +390,14 @@ export class ViewerReceiver {
         console.log('[LiveKit Viewer] Track unsubscribed:', track.source);
         this._rebuildStream();
       })
+      .on(RoomEvent.TrackPublished, (pub, participant) => {
+        console.log('[LiveKit Viewer] Track published:', pub.source);
+        this._rebuildStream();
+      })
+      .on(RoomEvent.TrackUnpublished, (pub, participant) => {
+        console.log('[LiveKit Viewer] Track unpublished:', pub.source);
+        this._rebuildStream();
+      })
       .on(RoomEvent.TrackMuted, (pub, participant) => {
         console.log('[LiveKit Viewer] Track muted:', pub.source);
         // Camera muted → notify UI to show camera-off overlay
@@ -413,6 +454,7 @@ export class ViewerReceiver {
         }
 
         if (!pub.isSubscribed || !pub.track?.mediaStreamTrack) return;
+        if (pub.track.mediaStreamTrack.readyState === 'ended') return;
 
         if (pub.source === Track.Source.ScreenShare && pub.kind === Track.Kind.Video) {
           screenShareTrack = pub.track.mediaStreamTrack;
