@@ -259,6 +259,22 @@ export class LecturerBroadcaster {
   /**
    * Stop screen share and revert preview to camera.
    */
+  _showScreenShareEndedNotification() {
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission === "granted") {
+      const n = new Notification("EduCast — Screen Share Stopped", {
+        body: "Click here to return to the live telecast lecturer page.",
+        tag: "screen-share-ended",
+        requireInteraction: true
+      });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    }
+  }
+
   async stopScreen() {
     if (!this.room || !this._isScreenSharing) return;
     await this.room.localParticipant.setScreenShareEnabled(false);
@@ -266,6 +282,7 @@ export class LecturerBroadcaster {
 
     // Bring browser focus back to the website page
     window.focus();
+    this._showScreenShareEndedNotification();
 
     // Flash document title to alert the user
     const originalTitle = document.title;
@@ -300,6 +317,7 @@ export class LecturerBroadcaster {
 
     // Bring browser focus back to the website page
     window.focus();
+    this._showScreenShareEndedNotification();
 
     // Flash document title to alert the user
     const originalTitle = document.title;

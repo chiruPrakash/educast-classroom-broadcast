@@ -44,9 +44,15 @@ export default function LecturerPage() {
     return unsub;
   }, []);
 
-  // Initialize camera preview on mount
+  // Initialize camera preview and request notification permission on mount
   useEffect(() => {
     initCameraPreview();
+
+    // Request notification permission for screen share focus helper
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     return () => {
       if (previewStreamRef.current) stopStream(previewStreamRef.current);
       if (broadcasterRef.current) broadcasterRef.current.destroy();
